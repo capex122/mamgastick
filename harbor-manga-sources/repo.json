@@ -3,6 +3,7 @@
   "plugins": [
     { "id": "3asq-ar", "name": "3asq (Arabic)", "version": "1.1.0", "lang": "ar", "nsfw": false, "entry": "3asq.plugin.js" },
     { "id": "olympus-ar", "name": "Olympus Staff (Arabic)", "version": "1.1.0", "lang": "ar", "nsfw": false, "entry": "olympus.plugin.js" },
+    { "id": "arcomixverse-ar", "name": "Arcomix Verse (Arabic)", "version": "1.0.0", "lang": "ar", "nsfw": false, "entry": "arcomixverse.plugin.js" },
     { "id": "mangadex-ar-en", "name": "MangaDex (Arabic)", "version": "1.1.1", "lang": "ar", "nsfw": false, "entry": "mangadex.plugin.js" },
     { "id": "mangadex-en", "name": "MangaDex (English)", "version": "1.1.1", "lang": "en", "nsfw": false, "entry": "mangadex-en.plugin.js" }
   ]

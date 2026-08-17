@@ -4,6 +4,7 @@ Harbor source repository containing:
 
 - 3asq (Arabic)
 - Olympus Staff (Arabic)
+- Arcomix Verse (Arabic comics)
 - MangaDex Arabic
 - MangaDex English
 
