@@ -65,7 +65,12 @@ const plugin = {
     return { id, title, cover: image && absolute(image.attr("data-src") || image.attr("src")), description, status: statusText, author };
   },
   async chapters(id) {
-    const doc = await documentAt(`${BASE}/manga/${encodeURIComponent(id)}/`);
+    const response = await harbor.http(`${BASE}/manga/${encodeURIComponent(id)}/ajax/chapters/`, {
+      method: "POST",
+      headers: { "user-agent": "Mozilla/5.0", "content-type": "application/x-www-form-urlencoded; charset=UTF-8" },
+      body: ""
+    });
+    const doc = response.ok ? await harbor.parseHtml(response.body) : null;
     if (!doc) return [];
     const result = [];
     const seen = new Set();
