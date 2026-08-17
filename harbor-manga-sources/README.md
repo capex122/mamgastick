@@ -4,7 +4,8 @@ Harbor source repository containing:
 
 - 3asq (Arabic)
 - Olympus Staff (Arabic)
-- MangaDex Arabic & English
+- MangaDex Arabic
+- MangaDex English
 
 Host this directory over HTTPS and paste the public `repo.json` URL into Harbor under **Manga → Set up a source → Extensions**.
 

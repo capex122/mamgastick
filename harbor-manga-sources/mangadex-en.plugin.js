@@ -1,40 +1,34 @@
 const API = "https://api.mangadex.org";
 const UPLOADS = "https://uploads.mangadex.org";
 const PAGE_SIZE = 48;
-const LANGUAGE = "ar";
-
+const LANGUAGE = "en";
 async function json(url) { return harbor.http(url, { responseType: "json", headers: { "user-agent": "Harbor-Manga/1.1" } }); }
 function relation(item, type) { return (item.relationships || []).find((entry) => entry.type === type); }
-function localized(values) { return values && (values[LANGUAGE] || values.en || Object.values(values)[0]); }
+function localized(values) { return values && (values[LANGUAGE] || Object.values(values)[0]); }
 function summary(item) {
   const a = item.attributes || {}, cover = relation(item, "cover_art"), descriptions = a.description || {};
   const file = cover && cover.attributes && cover.attributes.fileName;
-  let altTitle;
-  for (const value of a.altTitles || []) { if (value[LANGUAGE]) { altTitle = value[LANGUAGE]; break; } }
+  let altTitle; for (const value of a.altTitles || []) { if (value[LANGUAGE]) { altTitle = value[LANGUAGE]; break; } }
   return { id: item.id, title: localized(a.title) || "Untitled", altTitle,
     cover: file ? `${UPLOADS}/covers/${item.id}/${file}.512.jpg` : undefined,
     year: a.year || undefined, status: a.status || undefined, description: localized(descriptions),
     contentRating: a.contentRating || undefined, lastChapter: a.lastChapter || undefined };
 }
 function mangaQuery(offset, search, tagId) {
-  const p = new URLSearchParams();
-  p.set("limit", String(PAGE_SIZE)); p.set("offset", String(offset)); p.append("includes[]", "cover_art");
+  const p = new URLSearchParams(); p.set("limit", String(PAGE_SIZE)); p.set("offset", String(offset)); p.append("includes[]", "cover_art");
   p.append("availableTranslatedLanguage[]", LANGUAGE); p.append("contentRating[]", "safe"); p.append("contentRating[]", "suggestive");
   if (tagId) p.append("includedTags[]", tagId);
-  if (search) { p.set("title", search); p.set("order[relevance]", "desc"); } else p.set("order[followedCount]", "desc");
-  return p;
+  if (search) { p.set("title", search); p.set("order[relevance]", "desc"); } else p.set("order[followedCount]", "desc"); return p;
 }
 function feedUrl(id, offset) {
-  const p = new URLSearchParams(); p.set("limit", "500"); p.set("offset", String(offset));
-  p.append("translatedLanguage[]", LANGUAGE); p.append("includes[]", "scanlation_group");
-  p.set("order[volume]", "desc"); p.set("order[chapter]", "desc");
+  const p = new URLSearchParams(); p.set("limit", "500"); p.set("offset", String(offset)); p.append("translatedLanguage[]", LANGUAGE);
+  p.append("includes[]", "scanlation_group"); p.set("order[volume]", "desc"); p.set("order[chapter]", "desc");
   return `${API}/manga/${encodeURIComponent(id)}/feed?${p}`;
 }
 async function fullFeed(id) {
-  const first = await json(feedUrl(id, 0));
-  if (!first || !Array.isArray(first.data)) return [];
-  const total = Math.min(Number(first.total) || first.data.length, 5000), pages = [first.data];
-  const offsets = []; for (let offset = 500; offset < total; offset += 500) offsets.push(offset);
+  const first = await json(feedUrl(id, 0)); if (!first || !Array.isArray(first.data)) return [];
+  const total = Math.min(Number(first.total) || first.data.length, 5000), pages = [first.data], offsets = [];
+  for (let offset = 500; offset < total; offset += 500) offsets.push(offset);
   for (let start = 0; start < offsets.length; start += 5) {
     const batch = await Promise.all(offsets.slice(start, start + 5).map((offset) => json(feedUrl(id, offset))));
     for (const response of batch) if (response && Array.isArray(response.data)) pages.push(response.data);
@@ -42,7 +36,7 @@ async function fullFeed(id) {
   return pages.flat();
 }
 const plugin = {
-  id: "mangadex-ar-en", name: "MangaDex (Arabic)",
+  id: "mangadex-en", name: "MangaDex (English)",
   async popular(offset, tagId) { const r = await json(`${API}/manga?${mangaQuery(offset, "", tagId)}`); return r && Array.isArray(r.data) ? r.data.map(summary) : []; },
   async search(query, offset, tagId) { const r = await json(`${API}/manga?${mangaQuery(offset, query, tagId)}`); return r && Array.isArray(r.data) ? r.data.map(summary) : []; },
   async detail(id) { const r = await json(`${API}/manga/${encodeURIComponent(id)}?includes[]=cover_art`); return r && r.data ? summary(r.data) : null; },
