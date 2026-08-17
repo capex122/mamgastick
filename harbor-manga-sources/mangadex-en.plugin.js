@@ -33,7 +33,10 @@ async function fullFeed(id) {
     const batch = await Promise.all(offsets.slice(start, start + 5).map((offset) => json(feedUrl(id, offset))));
     for (const response of batch) if (response && Array.isArray(response.data)) pages.push(response.data);
   }
-  return pages.flat();
+  return pages.flat().filter((item) => {
+    const attributes = item.attributes || {};
+    return !attributes.externalUrl && Number(attributes.pages) > 0;
+  });
 }
 const plugin = {
   id: "mangadex-en", name: "MangaDex (English)",
@@ -44,8 +47,14 @@ const plugin = {
     id: item.id, chapter: a.chapter == null ? null : String(a.chapter), title: a.title || undefined,
     volume: a.volume == null ? null : String(a.volume), pages: Number.isInteger(a.pages) ? a.pages : 0, language: LANGUAGE,
     group: group && group.attributes ? group.attributes.name : undefined, publishAt: a.publishAt || undefined }; }); },
-  async pageUrls(chapterId) { const r = await json(`${API}/at-home/server/${encodeURIComponent(chapterId)}`); if (!r || !r.baseUrl || !r.chapter) return [];
-    return (r.chapter.data || []).map((file) => `${r.baseUrl}/data/${r.chapter.hash}/${file}`); },
+  async pageUrls(chapterId) {
+    const r = await json(`${API}/at-home/server/${encodeURIComponent(chapterId)}?forcePort443=false`);
+    if (!r || !r.baseUrl || !r.chapter || !r.chapter.hash) return [];
+    const original = Array.isArray(r.chapter.data) ? r.chapter.data : [];
+    if (original.length) return original.map((file) => `${r.baseUrl}/data/${r.chapter.hash}/${file}`);
+    const compressed = Array.isArray(r.chapter.dataSaver) ? r.chapter.dataSaver : [];
+    return compressed.map((file) => `${r.baseUrl}/data-saver/${r.chapter.hash}/${file}`);
+  },
   async tags() { const r = await json(`${API}/manga/tag`); if (!r || !Array.isArray(r.data)) return [];
     return r.data.map((item) => ({ id: item.id, name: localized(item.attributes.name), group: item.attributes.group || "genre" })); }
 };
