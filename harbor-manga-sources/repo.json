@@ -1,0 +1,8 @@
+{
+  "name": "Harbor Arabic & English Manga Sources",
+  "plugins": [
+    { "id": "3asq-ar", "name": "3asq (Arabic)", "version": "1.0.0", "lang": "ar", "nsfw": false, "entry": "3asq.plugin.js" },
+    { "id": "olympus-ar", "name": "Olympus Staff (Arabic)", "version": "1.0.0", "lang": "ar", "nsfw": false, "entry": "olympus.plugin.js" },
+    { "id": "mangadex-ar-en", "name": "MangaDex (Arabic & English)", "version": "1.0.0", "lang": "multi", "nsfw": false, "entry": "mangadex.plugin.js" }
+  ]
+}
