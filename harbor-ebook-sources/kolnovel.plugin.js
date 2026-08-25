@@ -1,6 +1,5 @@
 const BASE = "https://kolnovel.com";
 const HARBOR_PAGE = 48;
-const SITE_PAGE = 20;
 
 function abs(value, base) {
   if (!value) return undefined;
@@ -78,12 +77,13 @@ function pageUrl(kind, page, value) {
   const suffix = page > 1 ? "/page/" + page + "/" : "/";
   if (kind === "genre") return BASE + "/genre/" + value + suffix;
   if (kind === "search") return BASE + suffix + "?s=" + encodeURIComponent(value);
-  return BASE + "/series" + suffix + "?status=&type=&order=popular";
+  return BASE + "/series/?page=" + page + "&status=&type=&order=popular";
 }
 
 async function browse(kind, value, offset, tagId) {
-  const firstPage = Math.floor(offset / SITE_PAGE) + 1;
-  const innerOffset = offset % SITE_PAGE;
+  const sitePageSize = kind === "popular" ? 20 : 25;
+  const firstPage = Math.floor(offset / sitePageSize) + 1;
+  const innerOffset = offset % sitePageSize;
   const pages = await Promise.all([0, 1, 2].map((step) => getDocOrNull(pageUrl(kind, firstPage + step, value))));
   const combined = pages.flatMap((doc) => summariesFrom(doc, kind === "search" ? tagId : undefined));
   return combined.slice(innerOffset, innerOffset + HARBOR_PAGE);
