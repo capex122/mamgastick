@@ -21,3 +21,13 @@ https://raw.githubusercontent.com/capex122/mamgastick/main/harbor-manga-sources/
 - MangaDex — English
 
 After adding the repository, install and enable the individual sources you want to use. Refresh or reinstall a source when a newer plugin version is published.
+
+## eBook repository
+
+For Arabic novels, add this URL from Harbor's **eBook** extensions page:
+
+```text
+https://raw.githubusercontent.com/capex122/mamgastick/main/harbor-ebook-sources/repo.json
+```
+
+Available eBook source: **KolNovel (Arabic)**.
