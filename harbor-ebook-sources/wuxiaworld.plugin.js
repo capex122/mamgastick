@@ -107,11 +107,6 @@ async function catalogue(query, offset, tagId) {
   return doc.querySelectorAll(".novel-grid .novel-cell").map(cardToSummary).filter(Boolean);
 }
 
-function volumeFrom(title) {
-  const match = String(title || "").match(/(?:Book|Volume)\s*(\d+(?:\.\d+)?)/i);
-  return match ? match[1] : undefined;
-}
-
 function chapterFrom(title) {
   const matches = Array.from(String(title || "").matchAll(/Chapter\s*(\d+(?:\.\d+)?)/gi));
   return matches.length ? matches[matches.length - 1][1] : undefined;
@@ -124,8 +119,7 @@ function chapterRows(doc, startPosition) {
       id: abs(link.attr("href")) || "",
       chapter: chapterFrom(title),
       position: startPosition + index,
-      title,
-      volume: volumeFrom(title)
+      title
     };
   }).filter((chapter) => chapter.id);
 }
@@ -279,7 +273,7 @@ const plugin = {
           const lists = await Promise.all(batch.map((group) => chapterGroup(source.id, id, group)));
           chapters.push(...lists.flat());
         }
-        if (chapters.length) return chapters.sort((left, right) => left.position - right.position);
+        if (chapters.length) return chapters;
       } catch (_) {
         // Older Harbor builds or temporarily unavailable gRPC-Web fall back to
         // Wuxiaworld's official lightweight HTML table of contents below.

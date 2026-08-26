@@ -259,7 +259,7 @@ const plugin = {
     const doc = await getDoc(chapterId);
     const root = doc.querySelector("#kol_content, .epcontent");
     if (!root) return "";
-    let nodes = doc.querySelectorAll("#kol_content > p");
+    let nodes = doc.querySelectorAll("#kol_content > p, #kol_content > blockquote");
     if (!nodes.length) nodes = root.querySelectorAll("p, blockquote");
     return nodes.map((node) => cleanChapterBlock(node.text())).filter(Boolean).join("\n\n");
   },
