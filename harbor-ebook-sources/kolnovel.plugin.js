@@ -20,6 +20,23 @@ async function getDocOrNull(url) {
   try { return await getDoc(url); } catch (_) { return null; }
 }
 
+async function getChapterDoc(url) {
+  const response = await harbor.http(abs(url), {
+    responseType: "text",
+    timeoutMs: 30000,
+    headers: { "user-agent": "Mozilla/5.0" }
+  });
+  if (!response.ok) throw new Error("http " + response.status + " for " + url);
+  // KolNovel's malformed markup can make italic icon elements ancestors of
+  // #kol_content. Its global `i { display:none }` rule then causes Harbor's
+  // hidden-element filter to discard the whole chapter. Neutralize only the
+  // tag name; text and DOM order remain unchanged.
+  const html = response.body
+    .replace(/<i(?=\s|>)/gi, "<span")
+    .replace(/<\/i\s*>/gi, "</span>");
+  return harbor.parseHtml(html);
+}
+
 function seriesSlug(value) {
   const match = String(value || "").match(/\/series\/([^/?#]+)\/?/i);
   return match ? match[1] : "";
@@ -256,7 +273,7 @@ const plugin = {
   },
 
   async content(chapterId) {
-    const doc = await getDoc(chapterId);
+    const doc = await getChapterDoc(chapterId);
     const root = doc.querySelector("#kol_content, .epcontent");
     if (!root) return "";
     let nodes = doc.querySelectorAll("#kol_content > p, #kol_content > blockquote");
