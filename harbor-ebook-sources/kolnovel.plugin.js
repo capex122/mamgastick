@@ -207,7 +207,8 @@ const plugin = {
 
   async chapters(id) {
     const doc = await getDoc("/series/" + id + "/");
-    return doc.querySelectorAll(".eplister li").map((row) => {
+    const rows = doc.querySelectorAll(".eplister li").slice().reverse();
+    return rows.map((row, position) => {
       const link = row.querySelector("a[href]");
       const href = link && abs(link.attr("href"));
       const numberText = row.querySelector(".epl-num")?.text() || "";
@@ -215,6 +216,7 @@ const plugin = {
       return {
         id: href || "",
         chapter: chapterFrom(numberText) || numberFrom(title),
+        position,
         title,
         volume: volumeFrom(numberText) ?? undefined,
         publishAt: row.querySelector(".epl-date")?.text() || undefined,
