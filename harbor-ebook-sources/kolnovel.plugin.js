@@ -60,6 +60,22 @@ function cardToSummary(card) {
   };
 }
 
+function trendToSummary(card) {
+  const link = card.querySelector(".trenti a, .thumbtr a");
+  const href = link && abs(link.attr("href"));
+  const id = seriesSlug(href);
+  const title = link && (link.attr("title") || link.text());
+  if (!id || !title) return null;
+  const image = card.querySelector(".thumbtr img");
+  return {
+    id,
+    title: title.trim(),
+    cover: image && abs(image.attr("data-src") || image.attr("src")),
+    status: statusOf(card.querySelector(".thumbtr .status")?.text()),
+    description: card.querySelector(".trendsys")?.text()
+  };
+}
+
 function cardHasTag(card, tagId) {
   if (!tagId) return true;
   return card.querySelectorAll(".mdgenre a").some((link) => genreSlug(link.attr("href")) === tagId);
@@ -77,7 +93,8 @@ function pageUrl(kind, page, value) {
   const suffix = page > 1 ? "/page/" + page + "/" : "/";
   if (kind === "genre") return BASE + "/genre/" + value + suffix;
   if (kind === "search") return BASE + suffix + "?s=" + encodeURIComponent(value);
-  return BASE + "/series/?page=" + page + "&status=&type=&order=popular";
+  const order = kind === "latest" ? "update" : "popular";
+  return BASE + "/series/?page=" + page + "&status=&type=&order=" + order;
 }
 
 async function browse(kind, value, offset, tagId) {
@@ -89,16 +106,26 @@ async function browse(kind, value, offset, tagId) {
   return combined.slice(innerOffset, innerOffset + HARBOR_PAGE);
 }
 
+async function trending(offset) {
+  if (offset > 0) return [];
+  const doc = await getDoc("/");
+  return doc.querySelectorAll(".trendarea .trendlist").map(trendToSummary).filter(Boolean);
+}
+
 const plugin = {
   id: "kolnovel-ar",
   name: "KolNovel (Arabic)",
 
   async popular(offset, tagId) {
-    return tagId ? browse("genre", tagId, offset) : browse("popular", "", offset);
+    if (tagId === "__trending") return trending(offset);
+    if (tagId === "__latest") return browse("latest", "", offset);
+    if (tagId && tagId !== "__popular") return browse("genre", tagId, offset);
+    return browse("popular", "", offset);
   },
 
   async search(query, offset, tagId) {
-    return browse("search", query, offset, tagId);
+    const category = tagId && !tagId.startsWith("__") ? tagId : undefined;
+    return browse("search", query, offset, category);
   },
 
   async detail(id) {
@@ -164,7 +191,11 @@ const plugin = {
   async tags() {
     const doc = await getDoc("/series/");
     const seen = new Set();
-    const tags = [];
+    const tags = [
+      { id: "__popular", name: "Popular — الأكثر شعبية", group: "Browse" },
+      { id: "__trending", name: "Trending — الرائج هذا الأسبوع", group: "Browse" },
+      { id: "__latest", name: "Latest Releases — آخر الإصدارات", group: "Browse" }
+    ];
     for (const link of doc.querySelectorAll("a[href*='/genre/']")) {
       const id = genreSlug(link.attr("href"));
       const name = link.text().replace(/^#\s*/, "").trim();
