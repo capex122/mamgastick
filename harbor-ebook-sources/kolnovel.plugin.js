@@ -85,6 +85,29 @@ function volumeTitleFrom(text) {
   return match ? match[1].replace(/\s*:\s*/, ": ").trim() : undefined;
 }
 
+function cleanChapterBlock(value) {
+  let text = String(value || "").replace(/\s+/g, " ").trim();
+  if (!text) return "";
+  const boundaries = [
+    /\.shola-[a-z-]*/i,
+    /\bfunction\s+shola[A-Z]/,
+    /\bdocument\.getElementById\s*\(/i,
+    /🔥\s*تحدي\s+/,
+    /شراء\s+عملة\s+الشعلة/,
+    /[🏆💎]\s*أكبر\s+الداعمين/
+  ];
+  let cut = text.length;
+  for (const pattern of boundaries) {
+    const match = pattern.exec(text);
+    if (match && match.index < cut) cut = match.index;
+  }
+  text = text.slice(0, cut).trim();
+  if (!text) return "";
+  if (/(?:querySelectorAll|classList\.(?:add|remove)|modalId|background\s*:|border-radius\s*:|font-family\s*:|justify-content\s*:|box-sizing\s*:|var\s*\(--)/i.test(text)) return "";
+  if (/(?:حققنا\s+هدف\s+الشهر|الهدف\s*:\s*[\d,]+|شعلة\s+الهدف)/.test(text)) return "";
+  return text;
+}
+
 function statusOf(text) {
   const value = String(text || "").trim().toLowerCase();
   if (/completed|complete|مكتمل|مكتملة|منتهي|منتهية/.test(value)) return "completed";
@@ -236,9 +259,9 @@ const plugin = {
     const doc = await getDoc(chapterId);
     const root = doc.querySelector("#kol_content, .epcontent");
     if (!root) return "";
-    const paragraphs = doc.querySelectorAll("#kol_content > p").map((node) => node.text().trim()).filter(Boolean);
-    if (paragraphs.length) return paragraphs.join("\n\n");
-    return root.text().trim();
+    let nodes = doc.querySelectorAll("#kol_content > p");
+    if (!nodes.length) nodes = root.querySelectorAll("p, blockquote");
+    return nodes.map((node) => cleanChapterBlock(node.text())).filter(Boolean).join("\n\n");
   },
 
   async pageUrls(chapterId) {

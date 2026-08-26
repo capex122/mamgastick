@@ -5,7 +5,7 @@
     {
       "id": "kolnovel-ar",
       "name": "KolNovel (Arabic)",
-      "version": "1.4.0",
+      "version": "1.4.1",
       "lang": "ar",
       "nsfw": false,
       "entry": "kolnovel.plugin.js"
