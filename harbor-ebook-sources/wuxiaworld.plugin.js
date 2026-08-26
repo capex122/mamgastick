@@ -142,17 +142,6 @@ function encodeVarint(value) {
   return bytes;
 }
 
-function base64Bytes(bytes) {
-  let binary = "";
-  for (let index = 0; index < bytes.length; index += 1) binary += String.fromCharCode(bytes[index]);
-  return btoa(binary);
-}
-
-function bytesFromBase64(value) {
-  const binary = atob(String(value || ""));
-  return Array.from(binary, (char) => char.charCodeAt(0));
-}
-
 function readVarint(bytes, cursor) {
   let value = 0;
   let factor = 1;
@@ -200,39 +189,18 @@ function fieldText(fields, number) {
   return entry && entry.wire === 2 ? new TextDecoder().decode(new Uint8Array(entry.value)) : undefined;
 }
 
-function grpcPayload(base64) {
-  const bytes = bytesFromBase64(base64);
-  let index = 0;
-  while (index + 5 <= bytes.length) {
-    const flag = bytes[index];
-    const length = bytes[index + 1] * 16777216 + bytes[index + 2] * 65536 + bytes[index + 3] * 256 + bytes[index + 4];
-    const payload = bytes.slice(index + 5, index + 5 + length);
-    if ((flag & 128) === 0) return payload;
-    index += 5 + length;
-  }
-  return [];
-}
-
 async function chapterGroup(novelId, novelSlug, group) {
   const novel = encodeVarint(novelId);
   const groupId = encodeVarint(group.id);
   const wrappedGroup = [8, ...groupId];
   const filter = [10, wrappedGroup.length, ...wrappedGroup];
   const message = [8, ...novel, 18, filter.length, ...filter];
-  const frame = [0, 0, 0, 0, message.length, ...message];
-  const response = await harbor.http(API_BASE + "/wuxiaworld.api.v2.Chapters/GetChapterList", {
-    method: "POST",
-    responseType: "base64",
+  const response = await harbor.grpc(API_BASE + "/wuxiaworld.api.v2.Chapters/GetChapterList", message, {
+    mode: "grpc-web",
     timeoutMs: 30000,
-    headers: {
-      "content-type": "application/grpc-web-text+proto",
-      "x-grpc-web": "1",
-      "x-user-agent": "grpc-web-javascript/0.1"
-    },
-    body: base64Bytes(frame)
   });
-  if (!response.ok) throw new Error("Wuxiaworld chapters http " + response.status);
-  const responseFields = protobufFields(grpcPayload(response.body));
+  if (!response.ok) throw new Error(response.grpcMessage || "Wuxiaworld gRPC " + (response.grpcStatus ?? response.status));
+  const responseFields = protobufFields(response.body);
   const result = [];
   for (const groupEntry of responseFields[1] || []) {
     const groupFields = protobufFields(groupEntry.value);

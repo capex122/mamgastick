@@ -79,6 +79,12 @@ function volumeFrom(text) {
   return ordinals[named[1]] || null;
 }
 
+function volumeTitleFrom(text) {
+  const normalized = normalizeDigits(text).replace(/\s+/g, " ").trim();
+  const match = normalized.match(/((?:المجلد|مجلد)\s+.+?)(?=\s+الفصل(?:\s|$))/);
+  return match ? match[1].replace(/\s*:\s*/, ": ").trim() : undefined;
+}
+
 function statusOf(text) {
   const value = String(text || "").trim().toLowerCase();
   if (/completed|complete|مكتمل|مكتملة|منتهي|منتهية/.test(value)) return "completed";
@@ -219,6 +225,7 @@ const plugin = {
         position,
         title,
         volume: volumeFrom(numberText) ?? undefined,
+        volumeTitle: volumeTitleFrom(numberText),
         publishAt: row.querySelector(".epl-date")?.text() || undefined,
         views: row.querySelector(".epl-views, .epl-view")?.text().replace(/\s*(?:views?|مشاهدة)$/iu, "").trim() || undefined
       };
