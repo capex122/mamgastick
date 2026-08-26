@@ -31,7 +31,27 @@ function genreSlug(value) {
 }
 
 function numberFrom(text) {
-  const match = String(text || "").match(/(\d+(?:\.\d+)?)/);
+  const match = normalizeDigits(text).match(/(\d+(?:\.\d+)?)/);
+  return match ? match[1] : null;
+}
+
+function normalizeDigits(text) {
+  const arabic = "٠١٢٣٤٥٦٧٨٩";
+  const persian = "۰۱۲۳۴۵۶۷۸۹";
+  return String(text || "").replace(/[٠-٩۰-۹]/g, (digit) => {
+    const arabicIndex = arabic.indexOf(digit);
+    return String(arabicIndex >= 0 ? arabicIndex : persian.indexOf(digit));
+  });
+}
+
+function chapterFrom(text) {
+  const normalized = normalizeDigits(text);
+  const match = normalized.match(/الفصل\s*(\d+(?:\.\d+)?)/);
+  return match ? match[1] : numberFrom(normalized);
+}
+
+function volumeFrom(text) {
+  const match = normalizeDigits(text).match(/المجلد\s*(\d+(?:\.\d+)?)/);
   return match ? match[1] : null;
 }
 
@@ -158,12 +178,11 @@ const plugin = {
       const href = link && abs(link.attr("href"));
       const numberText = row.querySelector(".epl-num")?.text() || "";
       const title = row.querySelector(".epl-title")?.text() || numberText;
-      const volumeMatch = title.match(/المجلد\s*(\d+(?:\.\d+)?)/);
       return {
         id: href || "",
-        chapter: numberFrom(numberText) || numberFrom(title),
+        chapter: chapterFrom(numberText) || numberFrom(title),
         title,
-        volume: volumeMatch ? volumeMatch[1] : null,
+        volume: volumeFrom(numberText),
         pages: 1,
         language: "ar",
         group: "KolNovel",
