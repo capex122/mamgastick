@@ -1,5 +1,6 @@
 const BASE = "https://lite.wuxiaworld.com";
 const FULL_BASE = "https://www.wuxiaworld.com";
+const API_BASE = "https://api2.wuxiaworld.com";
 const CATALOGUE_PAGE_SIZE = 24;
 const TOC_PAGE_SIZE = 100;
 
@@ -16,6 +17,28 @@ async function getDoc(url) {
   });
   if (!response.ok) throw new Error("http " + response.status + " for " + url);
   return harbor.parseHtml(response.body);
+}
+
+async function getText(url) {
+  const response = await harbor.http(abs(url), {
+    responseType: "text",
+    timeoutMs: 30000,
+    headers: { "user-agent": "Mozilla/5.0" }
+  });
+  if (!response.ok) throw new Error("http " + response.status + " for " + url);
+  return response.body;
+}
+
+async function novelMetadata(id) {
+  const html = await getText(FULL_BASE + "/novel/" + id);
+  const match = html.match(/window\.__REACT_QUERY_STATE__\s*=\s*(\{.*?\});\s*window\.__APP_CONTEXT__/s);
+  if (!match) return null;
+  const state = JSON.parse(match[1]);
+  for (const query of state.queries || []) {
+    const item = query && query.state && query.state.data && query.state.data.item;
+    if (item && item.slug === id) return item;
+  }
+  return null;
 }
 
 function slugFrom(value) {
@@ -107,6 +130,140 @@ function chapterRows(doc, startPosition) {
   }).filter((chapter) => chapter.id);
 }
 
+function encodeVarint(value) {
+  const bytes = [];
+  let number = Math.max(0, Number(value) || 0);
+  do {
+    let byte = number % 128;
+    number = Math.floor(number / 128);
+    if (number) byte += 128;
+    bytes.push(byte);
+  } while (number);
+  return bytes;
+}
+
+function base64Bytes(bytes) {
+  let binary = "";
+  for (let index = 0; index < bytes.length; index += 1) binary += String.fromCharCode(bytes[index]);
+  return btoa(binary);
+}
+
+function bytesFromBase64(value) {
+  const binary = atob(String(value || ""));
+  return Array.from(binary, (char) => char.charCodeAt(0));
+}
+
+function readVarint(bytes, cursor) {
+  let value = 0;
+  let factor = 1;
+  while (cursor.index < bytes.length) {
+    const byte = bytes[cursor.index++];
+    value += (byte & 127) * factor;
+    if (!(byte & 128)) break;
+    factor *= 128;
+  }
+  return value;
+}
+
+function protobufFields(bytes) {
+  const fields = {};
+  const cursor = { index: 0 };
+  while (cursor.index < bytes.length) {
+    const tag = readVarint(bytes, cursor);
+    const field = Math.floor(tag / 8);
+    const wire = tag % 8;
+    let value;
+    if (wire === 0) value = readVarint(bytes, cursor);
+    else if (wire === 2) {
+      const length = readVarint(bytes, cursor);
+      value = bytes.slice(cursor.index, cursor.index + length);
+      cursor.index += length;
+    } else if (wire === 1) {
+      value = bytes.slice(cursor.index, cursor.index + 8);
+      cursor.index += 8;
+    } else if (wire === 5) {
+      value = bytes.slice(cursor.index, cursor.index + 4);
+      cursor.index += 4;
+    } else break;
+    (fields[field] || (fields[field] = [])).push({ wire, value });
+  }
+  return fields;
+}
+
+function fieldNumber(fields, number) {
+  const entry = fields[number] && fields[number][0];
+  return entry && entry.wire === 0 ? entry.value : undefined;
+}
+
+function fieldText(fields, number) {
+  const entry = fields[number] && fields[number][0];
+  return entry && entry.wire === 2 ? new TextDecoder().decode(new Uint8Array(entry.value)) : undefined;
+}
+
+function grpcPayload(base64) {
+  const bytes = bytesFromBase64(base64);
+  let index = 0;
+  while (index + 5 <= bytes.length) {
+    const flag = bytes[index];
+    const length = bytes[index + 1] * 16777216 + bytes[index + 2] * 65536 + bytes[index + 3] * 256 + bytes[index + 4];
+    const payload = bytes.slice(index + 5, index + 5 + length);
+    if ((flag & 128) === 0) return payload;
+    index += 5 + length;
+  }
+  return [];
+}
+
+async function chapterGroup(novelId, novelSlug, group) {
+  const novel = encodeVarint(novelId);
+  const groupId = encodeVarint(group.id);
+  const wrappedGroup = [8, ...groupId];
+  const filter = [10, wrappedGroup.length, ...wrappedGroup];
+  const message = [8, ...novel, 18, filter.length, ...filter];
+  const frame = [0, 0, 0, 0, message.length, ...message];
+  const response = await harbor.http(API_BASE + "/wuxiaworld.api.v2.Chapters/GetChapterList", {
+    method: "POST",
+    responseType: "base64",
+    timeoutMs: 30000,
+    headers: {
+      "content-type": "application/grpc-web-text+proto",
+      "x-grpc-web": "1",
+      "x-user-agent": "grpc-web-javascript/0.1"
+    },
+    body: base64Bytes(frame)
+  });
+  if (!response.ok) throw new Error("Wuxiaworld chapters http " + response.status);
+  const responseFields = protobufFields(grpcPayload(response.body));
+  const result = [];
+  for (const groupEntry of responseFields[1] || []) {
+    const groupFields = protobufFields(groupEntry.value);
+    const volume = String(fieldNumber(groupFields, 3) || group.order || "");
+    const volumeTitle = fieldText(groupFields, 2) || group.title || undefined;
+    for (const chapterEntry of groupFields[6] || []) {
+      const chapterFields = protobufFields(chapterEntry.value);
+      const sponsorEntry = chapterFields[15] && chapterFields[15][0];
+      const sponsorFields = sponsorEntry ? protobufFields(sponsorEntry.value) : {};
+      if (fieldNumber(sponsorFields, 1) === 1) continue;
+      const slug = fieldText(chapterFields, 3);
+      const title = fieldText(chapterFields, 2) || slug || "";
+      const offset = fieldNumber(chapterFields, 17);
+      const publishedEntry = chapterFields[18] && chapterFields[18][0];
+      const publishedFields = publishedEntry ? protobufFields(publishedEntry.value) : {};
+      const publishedSeconds = fieldNumber(publishedFields, 1);
+      if (!slug) continue;
+      result.push({
+        id: BASE + "/novel/" + novelSlug + "/" + slug,
+        chapter: chapterFrom(title),
+        position: typeof offset === "number" ? Math.max(0, offset - 1) : result.length,
+        title,
+        volume: volume || undefined,
+        volumeTitle,
+        publishAt: publishedSeconds ? new Date(publishedSeconds * 1000).toISOString() : undefined
+      });
+    }
+  }
+  return result;
+}
+
 const plugin = {
   id: "wuxiaworld-en",
   name: "Wuxiaworld (English)",
@@ -120,7 +277,9 @@ const plugin = {
   },
 
   async detail(id) {
-    const doc = await getDoc("/novel/" + id);
+    const results = await Promise.all([getDoc("/novel/" + id), novelMetadata(id).catch(() => null)]);
+    const doc = results[0];
+    const source = results[1];
     const root = doc.querySelector(".novel-head");
     if (!root) return null;
     const meta = root.querySelector(".muted.small")?.text() || "";
@@ -133,28 +292,31 @@ const plugin = {
       cover: abs(root.querySelector(".cover img")?.attr("src")),
       status: statusOf(meta),
       description,
-      author: authorMatch ? authorMatch[1].trim() : undefined,
-      chapters: chapterMatch ? Number(chapterMatch[1].replace(/,/g, "")) : undefined,
+      author: source?.authorName?.value || (authorMatch ? authorMatch[1].trim() : undefined),
+      genres: Array.isArray(source?.genres) ? source.genres : [],
+      chapters: source?.chapterInfo?.chapterCount?.value || (chapterMatch ? Number(chapterMatch[1].replace(/,/g, "")) : undefined),
+      volumes: Array.isArray(source?.chapterInfo?.chapterGroups) ? source.chapterInfo.chapterGroups.length : undefined,
       siteUrl: FULL_BASE + "/novel/" + id
     };
   },
 
   async chapters(id) {
+    const source = await novelMetadata(id).catch(() => null);
+    const groups = source?.chapterInfo?.chapterGroups;
+    if (source?.id && Array.isArray(groups) && groups.length) {
+      const lists = await Promise.all(groups.map((group) => chapterGroup(source.id, id, group)));
+      return lists.flat().sort((left, right) => left.position - right.position);
+    }
     const first = await getDoc("/novel/" + id);
     const meta = first.querySelector(".novel-head .muted.small")?.text() || "";
     const countMatch = meta.match(/([\d,]+)\s+chapters?/i);
     const total = countMatch ? Number(countMatch[1].replace(/,/g, "")) : TOC_PAGE_SIZE;
     const pageCount = Math.max(1, Math.ceil(total / TOC_PAGE_SIZE));
     const chapters = chapterRows(first, 0);
-    for (let page = 2; page <= pageCount; page += 8) {
-      const end = Math.min(pageCount, page + 7);
-      const docs = await Promise.all(Array.from({ length: end - page + 1 }, (_, index) =>
-        getDoc("/novel/" + id + "?toc=" + (page + index))
-      ));
-      docs.forEach((doc, index) => {
-        chapters.push(...chapterRows(doc, (page + index - 1) * TOC_PAGE_SIZE));
-      });
-    }
+    const docs = await Promise.all(Array.from({ length: Math.max(0, pageCount - 1) }, (_, index) =>
+      getDoc("/novel/" + id + "?toc=" + (index + 2))
+    ));
+    docs.forEach((doc, index) => chapters.push(...chapterRows(doc, (index + 1) * TOC_PAGE_SIZE)));
     return chapters;
   },
 
