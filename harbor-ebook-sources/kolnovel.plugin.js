@@ -135,6 +135,7 @@ const plugin = {
     const title = root.querySelector("h1")?.text() || id;
     const image = doc.querySelector(".sertothumb img");
     const author = root.querySelector(".sertoauth a[href*='/writer/']");
+    const synopsis = root.querySelector(".sersys > p");
     const yearMatch = root.text().match(/صدر في سنة\s*(\d{4})/);
     return {
       id,
@@ -143,7 +144,7 @@ const plugin = {
       cover: image && abs(image.attr("data-src") || image.attr("src")),
       year: yearMatch ? Number(yearMatch[1]) : undefined,
       status: statusOf(root.querySelector(".sertostat span")?.text()),
-      description: root.querySelector(".sersys")?.text(),
+      description: synopsis?.text(),
       contentRating: "safe",
       author: author?.text(),
       lastChapter: doc.querySelector(".eplister li .epl-num")?.text()
