@@ -272,8 +272,18 @@ const plugin = {
     const source = await novelMetadata(id).catch(() => null);
     const groups = source?.chapterInfo?.chapterGroups;
     if (source?.id && Array.isArray(groups) && groups.length) {
-      const lists = await Promise.all(groups.map((group) => chapterGroup(source.id, id, group)));
-      return lists.flat().sort((left, right) => left.position - right.position);
+      try {
+        const chapters = [];
+        for (let start = 0; start < groups.length; start += 6) {
+          const batch = groups.slice(start, start + 6);
+          const lists = await Promise.all(batch.map((group) => chapterGroup(source.id, id, group)));
+          chapters.push(...lists.flat());
+        }
+        if (chapters.length) return chapters.sort((left, right) => left.position - right.position);
+      } catch (_) {
+        // Older Harbor builds or temporarily unavailable gRPC-Web fall back to
+        // Wuxiaworld's official lightweight HTML table of contents below.
+      }
     }
     const first = await getDoc("/novel/" + id);
     const meta = first.querySelector(".novel-head .muted.small")?.text() || "";
@@ -281,10 +291,13 @@ const plugin = {
     const total = countMatch ? Number(countMatch[1].replace(/,/g, "")) : TOC_PAGE_SIZE;
     const pageCount = Math.max(1, Math.ceil(total / TOC_PAGE_SIZE));
     const chapters = chapterRows(first, 0);
-    const docs = await Promise.all(Array.from({ length: Math.max(0, pageCount - 1) }, (_, index) =>
-      getDoc("/novel/" + id + "?toc=" + (index + 2))
-    ));
-    docs.forEach((doc, index) => chapters.push(...chapterRows(doc, (index + 1) * TOC_PAGE_SIZE)));
+    for (let page = 2; page <= pageCount; page += 6) {
+      const end = Math.min(pageCount, page + 5);
+      const docs = await Promise.all(Array.from({ length: end - page + 1 }, (_, index) =>
+        getDoc("/novel/" + id + "?toc=" + (page + index))
+      ));
+      docs.forEach((doc, index) => chapters.push(...chapterRows(doc, (page + index - 1) * TOC_PAGE_SIZE)));
+    }
     return chapters;
   },
 
