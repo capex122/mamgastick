@@ -9,6 +9,15 @@
       "lang": "ar",
       "nsfw": false,
       "entry": "kolnovel.plugin.js"
+    },
+    {
+      "id": "wuxiaworld-en",
+      "name": "Wuxiaworld (English)",
+      "version": "1.0.0",
+      "lang": "en",
+      "nsfw": false,
+      "icon": "https://www.wuxiaworld.com/favicon.png",
+      "entry": "wuxiaworld.plugin.js"
     }
   ]
 }
