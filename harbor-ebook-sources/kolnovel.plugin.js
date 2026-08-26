@@ -51,8 +51,20 @@ function chapterFrom(text) {
 }
 
 function volumeFrom(text) {
-  const match = normalizeDigits(text).match(/المجلد\s*(\d+(?:\.\d+)?)/);
-  return match ? match[1] : null;
+  const normalized = normalizeDigits(text);
+  const numeric = normalized.match(/(?:المجلد|مجلد)\s*(\d+(?:\.\d+)?)/);
+  if (numeric) return numeric[1];
+  const named = normalized.match(/(?:المجلد|مجلد)\s*([^\s:]+)/);
+  if (!named) return null;
+  const ordinals = {
+    "الأول": "1", "الاول": "1", "الأولى": "1", "الاولى": "1",
+    "الثاني": "2", "الثانية": "2", "الثالث": "3", "الثالثة": "3",
+    "الرابع": "4", "الرابعة": "4", "الخامس": "5", "الخامسة": "5",
+    "السادس": "6", "السادسة": "6", "السابع": "7", "السابعة": "7",
+    "الثامن": "8", "الثامنة": "8", "التاسع": "9", "التاسعة": "9",
+    "العاشر": "10", "العاشرة": "10"
+  };
+  return ordinals[named[1]] || null;
 }
 
 function statusOf(text) {
