@@ -44,6 +44,18 @@ function normalizeDigits(text) {
   });
 }
 
+function cleanTitle(value) {
+  return String(value || "")
+    .replace(/[^\p{L}\p{N}'’]+/gu, " ")
+    .replace(/\s+(?:kol|كول)$/iu, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isFanEdition(value) {
+  return /(?:fan[ -]?made|fan edition|نسخة\s*الفان)/iu.test(String(value || ""));
+}
+
 function chapterFrom(text) {
   const normalized = normalizeDigits(text);
   const match = normalized.match(/الفصل\s*(\d+(?:\.\d+)?)/);
@@ -85,10 +97,12 @@ function cardToSummary(card) {
   const last = card.querySelector(".nchapter a");
   return {
     id,
-    title: title.trim(),
+    title: cleanTitle(title),
     cover: image && abs(image.attr("data-src") || image.attr("src")),
     description: card.querySelector(".contexcerpt")?.text(),
-    lastChapter: last?.text()
+    lastChapter: last?.text(),
+    siteUrl: href,
+    isFanMade: isFanEdition(title)
   };
 }
 
@@ -101,10 +115,12 @@ function trendToSummary(card) {
   const image = card.querySelector(".thumbtr img");
   return {
     id,
-    title: title.trim(),
+    title: cleanTitle(title),
     cover: image && abs(image.attr("data-src") || image.attr("src")),
     status: statusOf(card.querySelector(".thumbtr .status")?.text()),
-    description: card.querySelector(".trendsys")?.text()
+    description: card.querySelector(".trendsys")?.text(),
+    siteUrl: href,
+    isFanMade: isFanEdition(title)
   };
 }
 
@@ -169,17 +185,23 @@ const plugin = {
     const author = root.querySelector(".sertoauth a[href*='/writer/']");
     const synopsis = root.querySelector(".sersys > p");
     const yearMatch = root.text().match(/صدر في سنة\s*(\d{4})/);
+    const rows = doc.querySelectorAll(".eplister li");
+    const volumes = new Set(rows.map((row) => volumeFrom(row.querySelector(".epl-num")?.text() || "")).filter((value) => value !== null));
+    const rawTitle = title;
     return {
       id,
-      title,
+      title: cleanTitle(rawTitle),
       altTitle: root.querySelector(".alter")?.text(),
       cover: image && abs(image.attr("data-src") || image.attr("src")),
       year: yearMatch ? Number(yearMatch[1]) : undefined,
       status: statusOf(root.querySelector(".sertostat span")?.text()),
       description: synopsis?.text(),
-      contentRating: "safe",
       author: author?.text(),
-      lastChapter: doc.querySelector(".eplister li .epl-num")?.text()
+      genres: root.querySelectorAll("a[href*='/genre/']").map((link) => link.text().replace(/^#\s*/, "").trim()).filter(Boolean),
+      chapters: rows.length || undefined,
+      volumes: volumes.size || undefined,
+      siteUrl: BASE + "/series/" + id + "/",
+      isFanMade: isFanEdition(rawTitle)
     };
   },
 
@@ -194,13 +216,20 @@ const plugin = {
         id: href || "",
         chapter: chapterFrom(numberText) || numberFrom(title),
         title,
-        volume: volumeFrom(numberText),
-        pages: 1,
-        language: "ar",
-        group: "KolNovel",
-        publishAt: row.querySelector(".epl-date")?.text() || undefined
+        volume: volumeFrom(numberText) ?? undefined,
+        publishAt: row.querySelector(".epl-date")?.text() || undefined,
+        views: row.querySelector(".epl-views, .epl-view")?.text().replace(/\s*(?:views?|مشاهدة)$/iu, "").trim() || undefined
       };
     }).filter((chapter) => chapter.id);
+  },
+
+  async content(chapterId) {
+    const doc = await getDoc(chapterId);
+    const root = doc.querySelector("#kol_content, .epcontent");
+    if (!root) return "";
+    const paragraphs = doc.querySelectorAll("#kol_content > p").map((node) => node.text().trim()).filter(Boolean);
+    if (paragraphs.length) return paragraphs.join("\n\n");
+    return root.text().trim();
   },
 
   async pageUrls(chapterId) {
