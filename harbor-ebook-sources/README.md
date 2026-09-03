@@ -7,7 +7,7 @@ eBook and audiobook providers for Harbor.
 In Harbor, open **eBook → Set up a source → Extensions** and add:
 
 ```text
-https://raw.githubusercontent.com/capex122/mamgastick/main/harbor-ebook-sources/repo.json
+https://raw.githubusercontent.com/capex122/mamgastick/refs/heads/main/harbor-ebook-sources/repo.json
 ```
 
 Available sources:

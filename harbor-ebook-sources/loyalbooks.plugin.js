@@ -49,6 +49,36 @@ function durationSeconds(value) {
   return parts[0] || undefined;
 }
 
+function splitFullBookText(value) {
+  const text = (value || "").replace(/\r\n?/g, "\n");
+  const heading = /^(?:chapter|chap\.?)\s+([0-9]+|[ivxlcdm]+)(?:\s*[-:.—]\s*(.*))?\s*$/gim;
+  const matches = Array.from(text.matchAll(heading));
+  return matches
+    .map((match, position) => ({
+      title: clean(match[2]) || clean(match[0]),
+      chapter: match[1],
+      text: text.slice(
+        (match.index || 0) + match[0].length,
+        matches[position + 1]?.index ?? text.length,
+      ).trim(),
+    }))
+    .filter((chapter) => chapter.text.length >= 200);
+}
+
+function textChapterId(url, index) {
+  return "txt:" + encodeURIComponent(url) + ":" + index;
+}
+
+function parseTextChapterId(id) {
+  const match = (id || "").match(/^txt:(.+):(\d+)$/);
+  if (!match) return null;
+  try {
+    return { url: decodeURIComponent(match[1]), index: Number(match[2]) };
+  } catch (_) {
+    return null;
+  }
+}
+
 function cardToSummary(cell) {
   const link = cell.querySelector("a[href^='/book/']");
   const title = clean(link?.querySelector("b")?.text());
@@ -147,7 +177,6 @@ const plugin = {
       originalLanguage: "en",
       genres,
       score,
-      chapters: doc.querySelector("a[href^='/download/text/']") ? 1 : 0,
       siteUrl: BASE + "/book/" + encodeURIComponent(id),
     };
   },
@@ -155,12 +184,24 @@ const plugin = {
   async chapters(id) {
     const doc = await getDoc("/book/" + encodeURIComponent(id));
     const href = doc.querySelector("a[href^='/download/text/']")?.attr("href");
-    return href ? [{ id: absolute(href), chapter: "1", title: "Full text", position: 0 }] : [];
+    if (!href) return [];
+    const url = absolute(href);
+    const sections = splitFullBookText(await requestText(url));
+    return sections.map((section, position) => ({
+      id: textChapterId(url, position),
+      chapter: section.chapter,
+      title: section.title,
+      position,
+    }));
   },
 
   async content(chapterId) {
-    if (!/^https:\/\/www\.loyalbooks\.com\/download\/text\//i.test(chapterId)) throw new Error("Invalid Loyal Books text chapter URL");
-    return await requestText(chapterId);
+    const selected = parseTextChapterId(chapterId);
+    if (!selected || !/^https:\/\/www\.loyalbooks\.com\/download\/text\//i.test(selected.url)) {
+      throw new Error("Invalid Loyal Books text chapter ID");
+    }
+    const sections = splitFullBookText(await requestText(selected.url));
+    return sections[selected.index]?.text || "";
   },
 
   async audiobookChapters(id) {
