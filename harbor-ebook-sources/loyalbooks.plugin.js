@@ -49,6 +49,13 @@ function durationSeconds(value) {
   return parts[0] || undefined;
 }
 
+function audioChapterRange(title, description) {
+  const value = clean(title) + " " + clean(description);
+  const match = value.match(/(?:chapters?|chap\.?|فصل|الفصول)\s*([0-9]+)(?:\s*[-–—]\s*([0-9]+))?/i);
+  if (!match) return null;
+  return { start: match[1], end: match[2] || match[1] };
+}
+
 function splitFullBookText(value) {
   const text = (value || "").replace(/\r\n?/g, "\n");
   const heading = /^(?:chapter|chap\.?)\s+([0-9]+|[ivxlcdm]+)(?:\s*[-:.—]\s*(.*))?\s*$/gim;
@@ -211,13 +218,20 @@ const plugin = {
     const items = xml.match(/<item\b[^>]*>[\s\S]*?<\/item>/gi) || [];
     return items.map((item, position) => {
       const title = decodeXml(item.match(/<title>([\s\S]*?)<\/title>/i)?.[1]);
+      const description = clean(decodeXml(item.match(/<description>([\s\S]*?)<\/description>/i)?.[1]));
       const url = decodeXml(item.match(/<enclosure\b[^>]*\burl=["']([^"']+)["']/i)?.[1]);
       const duration = decodeXml(item.match(/<itunes:duration>([\s\S]*?)<\/itunes:duration>/i)?.[1]);
       const chapterMatch = clean(title).match(/^(\d+)\s*[-–:]\s*(.*)$/);
+      const displayTitle = clean(chapterMatch?.[2] || title) || "Chapter " + (position + 1);
+      const range = audioChapterRange(displayTitle, description);
+      const coversMultipleChapters = !!range && range.start !== range.end;
       return {
         id: absolute(url),
-        title: clean(chapterMatch?.[2] || title) || "Chapter " + (position + 1),
-        chapter: chapterMatch?.[1] || String(position + 1),
+        title: displayTitle,
+        description: description || undefined,
+        chapter: coversMultipleChapters ? undefined : (range?.start || chapterMatch?.[1] || String(position + 1)),
+        chapterStart: coversMultipleChapters ? range.start : undefined,
+        chapterEnd: coversMultipleChapters ? range.end : undefined,
         duration: durationSeconds(duration),
         language: "en",
       };
