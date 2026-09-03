@@ -18,6 +18,15 @@
       "nsfw": false,
       "icon": "https://www.wuxiaworld.com/favicon.png",
       "entry": "wuxiaworld.plugin.js"
+    },
+    {
+      "id": "loyalbooks-en",
+      "name": "Loyal Books (English)",
+      "version": "1.0.0",
+      "lang": "en",
+      "nsfw": false,
+      "icon": "https://www.loyalbooks.com/favicon.ico",
+      "entry": "loyalbooks.plugin.js"
     }
   ]
 }

@@ -1,6 +1,6 @@
-# Harbor Arabic eBook Sources
+# Harbor eBook Sources
 
-Arabic eBook providers for Harbor.
+eBook and audiobook providers for Harbor.
 
 ## Install
 
@@ -10,8 +10,8 @@ In Harbor, open **eBook → Set up a source → Extensions** and add:
 https://raw.githubusercontent.com/capex122/mamgastick/main/harbor-ebook-sources/repo.json
 ```
 
-Then install **KolNovel (Arabic)**.
+Available sources:
 
-The source includes **Popular**, **Trending this week**, **Latest Releases**, and genre browse filters.
-
-KolNovel chapters are delivered through the site's official generated PDF endpoint, avoiding its obfuscated browser-only chapter markup.
+- **KolNovel (Arabic)** — popular, trending, latest releases, genre filters, and generated PDF chapters.
+- **Wuxiaworld (English)** — English web novels.
+- **Loyal Books (English)** — public-domain books, full-text downloads, and chapter-by-chapter audiobook streaming.
