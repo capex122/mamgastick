@@ -164,8 +164,10 @@ const plugin = {
   },
 
   async audiobookChapters(id) {
+    // Loyal Books exposes the complete, non-paginated track list in one RSS feed.
+    // Parse every item in source order and retain its own enclosure as the track id.
     const xml = await requestText(BASE + "/book/" + encodeURIComponent(id) + "/feed");
-    const items = xml.match(/<item>[\s\S]*?<\/item>/gi) || [];
+    const items = xml.match(/<item\b[^>]*>[\s\S]*?<\/item>/gi) || [];
     return items.map((item, position) => {
       const title = decodeXml(item.match(/<title>([\s\S]*?)<\/title>/i)?.[1]);
       const url = decodeXml(item.match(/<enclosure\b[^>]*\burl=["']([^"']+)["']/i)?.[1]);
@@ -182,6 +184,7 @@ const plugin = {
   },
 
   async audiobookStream(chapterId) {
+    // Each chapter id is its selected RSS item's direct enclosure URL.
     if (!/^https?:\/\//i.test(chapterId)) return null;
     return { url: absolute(chapterId), format: "mp3" };
   },
