@@ -7,7 +7,7 @@ const PAGE_SIZE = 100;
 const SEARCH_PAGE_SIZE = 20;
 
 async function requestText(url) {
-  const response = await harbor.http(url, { responseType: "text", timeoutMs: 30000 });
+  const response = await harbor.http(url, { responseType: "text", timeoutMs: 45000 });
   if (!response.ok) throw new Error("HTTP " + response.status + " for " + url);
   return response.body || "";
 }
@@ -73,6 +73,31 @@ function parseCards(doc) {
   return doc.querySelectorAll("table.layout2-blue td.layout2-blue").map(cardToSummary).filter(Boolean);
 }
 
+function parseCardsFromHtml(html) {
+  const books = [];
+  const cells = html.match(/<td\b[^>]*class=["'][^"']*\blayout2-blue\b[^"']*["'][^>]*>[\s\S]*?<\/td>/gi) || [];
+  for (const cell of cells) {
+    const href = decodeXml(cell.match(/<a\b[^>]*href=["'](\/book\/[^"']+)["']/i)?.[1]);
+    const title = clean(decodeXml(cell.match(/<b>([\s\S]*?)<\/b>/i)?.[1]).replace(/<[^>]+>/g, " "));
+    if (!href || !title) continue;
+    const image = decodeXml(cell.match(/<img\b[^>]*src=["']([^"']+)["']/i)?.[1]);
+    const author = clean(
+      decodeXml(cell.match(/<\/b>\s*<\/a>\s*<br\s*\/?>([^<]*)/i)?.[1]).replace(/<[^>]+>/g, " "),
+    );
+    const score = Number(cell.match(/\bid=["']star(\d+)["']/i)?.[1]) || undefined;
+    books.push({
+      id: idFromHref(href),
+      title,
+      author: author || undefined,
+      cover: absolute(image),
+      score,
+      status: "completed",
+      siteUrl: absolute(href),
+    });
+  }
+  return books;
+}
+
 const plugin = {
   id: "loyalbooks-en",
   name: "Loyal Books (English)",
@@ -80,7 +105,9 @@ const plugin = {
   async popular(offset) {
     const page = Math.floor(Math.max(0, offset) / PAGE_SIZE) + 1;
     const path = page === 1 ? "/Top_100" : "/Top_100/" + page;
-    return parseCards(await getDoc(path));
+    const html = await requestText(absolute(path));
+    const parsed = parseCards(await harbor.parseHtml(html));
+    return parsed.length ? parsed : parseCardsFromHtml(html);
   },
 
   async search(query, offset) {
